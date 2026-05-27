@@ -114,6 +114,9 @@ Player.prototype.getDataFromDb = function(document){
 // 广播 furniture-pickup（让所有客户端的家具 sprite 消失）由 GameServer.checkFurniture 负责。
 Player.prototype.pickupFurniture = function(furniture){
     this.inventory[furniture.kind] = (this.inventory[furniture.kind] || 0) + 1;
+    // 立刻存档：家具一旦被捡走就从世界永久消失，不存档 + 玩家在走够 30 tile 触发
+    // checkSave 之前断线 → inventory 改动丢失而世界已少一个家具，造成不可逆数据不一致。
+    GameServer.savePlayer(this);
     var socket = GameServer.server.getSocket(this.socketID);
     if(socket) socket.emit('inventory-update', {moerDou: this.moerDou, inventory: this.inventory});
 };
