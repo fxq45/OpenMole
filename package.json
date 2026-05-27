@@ -1,7 +1,7 @@
 {
-  "name": "phaserquest",
-  "version": "1.0.0",
-  "description": "Clone of Mozilla's BrowserQuest with the Phaser engine",
+  "name": "openmole",
+  "version": "0.2.0",
+  "description": "OpenMole — a white-box clone-prototype of 摩尔庄园, built on a fork of Jerenaux/phaserquest.",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -20,15 +20,18 @@
     "url": "git+https://github.com/Jerenaux/phaserquest"
   },
   "keywords": [
-    "Browserquest",
-    "Phaser",
-    "online",
-    "game",
+    "openmole",
+    "moerzhuangyuan",
+    "摩尔庄园",
+    "phaserquest",
+    "browserquest",
+    "phaser",
+    "mmo",
     "html5"
   ],
-  "author": "Jerome Renaux",
+  "author": "Jerome Renaux (original phaserquest); OpenMole contributors",
   "license": "MIT",
-  "homepage": "https://github.com/Jerenaux/phaserquest#readme",
+  "homepage": "https://github.com/fxq45/phaserquest#readme",
   "dependencies": {
     "clone": "^2.1.0",
     "express": "^4.14.0",
