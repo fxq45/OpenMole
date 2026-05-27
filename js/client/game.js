@@ -50,7 +50,9 @@ Game.init = function(){
 
 Game.preload = function() {
     game.load.tilemap('map', 'assets/maps/minimap_client.json', null, Phaser.Tilemap.TILED_JSON);
-    game.load.spritesheet('tileset', 'assets/tilesets/tilesheet.png',32,32);
+    // M2 (OpenMole): 白盒 tileset，5 个 32x32 纯色方块（爱心广场/摩尔城堡/拉姆农场/淘淘乐街/墙）
+    // 原 tilesheet.png 已不再加载（位于 assets/tilesets/tilesheet.png，未删除以备 M4+ 资源切换参考）
+    game.load.spritesheet('tileset', 'assets/tilesets/whitebox.png',32,32);
     game.load.atlasJSONHash('atlas4', 'assets/sprites/atlas4.png', 'assets/sprites/atlas4.json'); // Atlas of monsters
     game.load.spritesheet('bubble', 'assets/sprites/bubble2.png',5,5); // tilesprite used to make speech bubbles
     game.load.spritesheet('life', 'assets/sprites/lifelvl.png',5,18); // tilesprite used to make lifebar
@@ -89,6 +91,7 @@ Game.create = function() {
     Game.displayMap(); // Reads the Tiled JSON to generate the map, manage layers, create collision array for the pathfinding and make a dictionary of teleports
     //Game.displayScenery(); // Finds all "scenery" tiles in the map and replace them by animated sprites
     Game.displayNPC(); // Read the Tiled JSON and display the NPC
+    Game.displayZoneLabels(); // M2 (OpenMole): 在 4 个白盒区域中心渲染中文区域名
 
     Game.createMarker(); // Creates the marker following the pointer that highlight tiles
     Game.makeHPtexts(); // Creates a pool of text elements to use to display HP
@@ -870,14 +873,9 @@ Game.computeView = function(){
 };
 
 Game.checkCameraBounds = function(){
-    // Due to the shape of the map, the bounds of the camera cannot always be the same; north of some Y coordinate (Game.mapWideningY),
-    // the width of the bounds has to increase, from 92 to 113.
-    var pos = Game.computeTileCoords(Game.player.x,Game.player.y);
-    if(Game.cameraFollowing && pos.y <= Game.mapWideningY && game.camera.bounds.width == 92*Game.map.tileWidth){
-        Game.tweenCameraBounds(113);
-    }else if(Game.cameraFollowing && pos.y > Game.mapWideningY && game.camera.bounds.width == 113*Game.map.tileWidth){
-        Game.tweenCameraBounds(92);
-    }
+    // M2 (OpenMole): 白盒地图只有一张，无需动态调整相机边界。
+    // 原逻辑根据 mapWideningY (=54) 在 172x314 原版地图上把相机宽度在 92/113 之间切换。
+    // @deprecated 留 stub 以保留调用方接口不动；等 M3 Realm 切换时可重新实现。
 };
 
 Game.tweenCameraBounds = function(width){
@@ -889,9 +887,16 @@ Game.tweenCameraBounds = function(width){
 
 Game.followPlayer = function(){ // Make the camera follow the player, within the appropriate bounds
     Game.inDoor = false;
-    // Rectangle to which the camera is bound, cannot move outside it
-    var width = (Game.player.x >= 92 ? 113 : 92);
-    game.camera.bounds = new Phaser.Rectangle(Game.map.tileWidth-Game.borderPadding,Game.map.tileWidth-Game.borderPadding,width*Game.map.tileWidth,311*Game.map.tileWidth);
+    // M2 (OpenMole): 相机边界改为整张白盒地图大小（原代码硬编码 92/113/311 是为 172x314 原版地图设计的）。
+    // 等 M3 引入 Realm 切换时，每个 Realm 会有独立的相机配置；当前白盒只有一张图。
+    var w = Game.map.widthInPixels - 2*(Game.map.tileWidth - Game.borderPadding);
+    var h = Game.map.heightInPixels - 2*(Game.map.tileWidth - Game.borderPadding);
+    game.camera.bounds = new Phaser.Rectangle(
+        Game.map.tileWidth - Game.borderPadding,
+        Game.map.tileWidth - Game.borderPadding,
+        w,
+        h
+    );
     game.camera.follow(Game.cameraFocus);
     Game.cameraFollowing = true;
 };
@@ -1283,6 +1288,34 @@ Game.displayNPC = function() {
         if (!entities.hasOwnProperty(object.gid - 1961)) continue; // 1961 is the starting ID of the npc tiles in the map ; this follows from how the map was made in the original BrowserQuest
         var entityInfo = entities[object.gid - 1961];
         if(entityInfo.npc) Game.basicAtlasAnimation(Game.entities.add(new NPC(object.x, object.y, entityInfo.sprite)));
+    }
+};
+
+// M2 (OpenMole): 4 个白盒区域名称的中文标签。
+// 用 Phaser 原生 text（canvas 字体）而非 BitmapText：BitmapText 需自制 XML+PNG 字体才能支持
+// 中文字符，白盒阶段不值得；后续做正式 UI 时再统一替换。
+Game.zoneLabels = [
+    { text: '爱心广场', tileX: 17, tileY: 10 },  // 左上：白色区中心
+    { text: '摩尔城堡', tileX: 50, tileY: 10 },  // 右上：灰色区中心
+    { text: '拉姆农场', tileX: 17, tileY: 29 },  // 左下：绿色区中心
+    { text: '淘淘乐街', tileX: 50, tileY: 29 }   // 右下：黄色区中心
+];
+
+Game.displayZoneLabels = function() {
+    var tw = Game.map.tileWidth;
+    var th = Game.map.tileHeight;
+    var style = {
+        font: 'bold 28px Microsoft YaHei, PingFang SC, Heiti SC, sans-serif',
+        fill: '#222',
+        stroke: '#fff',
+        strokeThickness: 4,
+        align: 'center'
+    };
+    Game.zoneLabelsGroup = game.add.group(Game.groundMapLayers); // 跟随地图分组，处于实体下方
+    for (var i = 0; i < Game.zoneLabels.length; i++) {
+        var z = Game.zoneLabels[i];
+        var t = game.add.text(z.tileX * tw, z.tileY * th, z.text, style, Game.zoneLabelsGroup);
+        t.anchor.set(0.5, 0.5);
     }
 };
 

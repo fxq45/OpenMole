@@ -1,3 +1,47 @@
+# OpenMole
+
+**OpenMole** 是一款以《摩尔庄园》为蓝本的开源白盒 MMO 原型，fork 自 [Jerenaux/phaserquest](https://github.com/Jerenaux/phaserquest)。当前阶段：**M2 白盒地图**（无美术资源，纯色 tile + 中文区域标签验证玩法/网络/状态机）。
+
+> 项目代号 OpenMole 是为了避免与"摩尔庄园" / "Moore Manor" 商标冲突。
+
+### 改造里程碑
+
+| 里程碑 | 内容 | 状态 |
+|---|---|---|
+| M0 | Docker 环境跑通原版 phaserquest | ✅ ([PR #1](https://github.com/fxq45/phaserquest/pull/1)) |
+| M1 | 关闭战斗系统（`combatEnabled` flag + `@deprecated`）| ✅ ([PR #2](https://github.com/fxq45/phaserquest/pull/2)) |
+| M2 | 白盒地图 + 4 区域（爱心广场/拉姆农场/摩尔城堡/淘淘乐街）| 🚧 当前 |
+| M3 | Realm 场景切换（多张白盒图，门传送）| - |
+| M4 | 摩尔豆 + 白盒背包 | - |
+| M5 | 第一个小游戏（白盒泡泡龙）| - |
+| M6 | 拉姆养成 + 任务系统 | - |
+
+完整改造路线详见 [docs/OPENMOLE_PLAN.md](docs/OPENMOLE_PLAN.md)。
+
+### 白盒地图说明
+
+`assets/maps/minimap_*.json` 和 `assets/tilesets/whitebox.png` 由以下脚本生成（不要手改）：
+
+```bash
+python3 scripts/generate-whitebox-tileset.py   # 生成 5x1 纯色方块 PNG
+node scripts/generate-whitebox-map.js          # 生成 68x40 tile 的 Tiled JSON
+```
+
+要换地图布局/颜色，改这两个脚本里的常量后重新执行即可。
+
+### 启动
+
+```bash
+docker compose up -d --build
+# 浏览器打开 http://localhost/
+```
+
+老存档（来自原版 172x314 地图）的坐标会自动重置到出生点，无需手动清库。
+
+---
+
+## 以下为原始 phaserquest README（保留以备参考）
+
 # phaserquest
 
 Phaser Quest is a reproduction of Mozilla's [Browserquest](http://browserquest.mozilla.org/) using the following tools:

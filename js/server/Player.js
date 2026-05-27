@@ -82,6 +82,17 @@ Player.prototype.getDataFromDb = function(document){
     for(var p = 0; p < dbProperties.length; p++){
         this[dbProperties[p]] = document[dbProperties[p]];
     }
+    // M2 (OpenMole): 老存档可能来自原版 172x314 地图，若坐标超出当前白盒地图边界则重置到出生点。
+    // 这样 Patricia 不用每次切地图都 `docker compose down -v` 清库。
+    var mw = GameServer.map.width;
+    var mh = GameServer.map.height;
+    if (this.x < 0 || this.x >= mw || this.y < 0 || this.y >= mh) {
+        console.log('Player ' + document.name + ' had out-of-bounds saved position ('
+            + this.x + ',' + this.y + ') for map ' + mw + 'x' + mh + ', resetting to spawn.');
+        var spawn = GameServer.determineStartingPosition();
+        this.x = spawn.x;
+        this.y = spawn.y;
+    }
     this.setAOI();
     this.equip(1,document['weapon']);
     this.equip(2,document['armor']);
