@@ -21,6 +21,10 @@ function Player(name){
     this.equip(2,"clotharmor");
     this.updatePacket = new PersonalUpdatePacket();
     this.newAOIs = [];
+    // M4a (OpenMole): 摩尔豆货币 + 背包。新玩家默认 100 豆、空背包。
+    // inventory 用 { kind -> count } 字典存储，便于增量更新；按需求未来要支持多 slot 再升级。
+    this.moerDou = 100;
+    this.inventory = {};
 }
 
 Player.prototype = Object.create(MovingEntity.prototype); // Declares the inheritance relationship
@@ -72,6 +76,9 @@ Player.prototype.dbTrim = function(){
     }
     trimmed['weapon'] = GameServer.db.itemsIDmap[this.weapon];
     trimmed['armor'] = GameServer.db.itemsIDmap[this.armor];
+    // M4a (OpenMole): 持久化货币 + 背包
+    trimmed['moerDou'] = this.moerDou;
+    trimmed['inventory'] = this.inventory;
     return trimmed;
 };
 
@@ -96,6 +103,18 @@ Player.prototype.getDataFromDb = function(document){
     this.setAOI();
     this.equip(1,document['weapon']);
     this.equip(2,document['armor']);
+    // M4a (OpenMole): 老存档没有这两个字段时给默认值（== 新玩家初始值）
+    this.moerDou = (typeof document.moerDou === 'number') ? document.moerDou : 100;
+    this.inventory = (document.inventory && typeof document.inventory === 'object') ? document.inventory : {};
+};
+
+// M4a (OpenMole): 拾起家具 — 加进 inventory + 摩尔豆奖励 + 通知本人最新数据。
+// 广播 furniture-pickup（让所有客户端的家具 sprite 消失）由 GameServer.checkFurniture 负责。
+Player.prototype.pickupFurniture = function(furniture){
+    this.inventory[furniture.kind] = (this.inventory[furniture.kind] || 0) + 1;
+    this.moerDou += furniture.value;
+    var socket = GameServer.server.getSocket(this.socketID);
+    if(socket) socket.emit('inventory-update', {moerDou: this.moerDou, inventory: this.inventory});
 };
 
 Player.prototype.getIndividualUpdatePackage = function(){

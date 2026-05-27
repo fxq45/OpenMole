@@ -1330,6 +1330,116 @@ Game.displayZoneLabels = function() {
 };
 
 // ===========================
+// M4a (OpenMole): 摩尔豆货币 + 背包 + 世界家具渲染
+//
+// 设计取舍：
+// - 家具用 Phaser.Graphics 画带颜色的圆角矩形，不进 tilemap（要支持动态消失）。
+// - 不挂 input.enabled，方便点击穿透到下方 tile，玩家可以直接点家具寻路过去捡。
+// - 收到 furniture-pickup 广播 → 淡出补间动画 → destroy。
+// - HUD 部分用 fixedToCamera = true 跟随相机，右上角显示「💰 N」+ 背包侧栏。
+
+Game.furnitureKinds = {
+    chair:  { color: 0xcc4444, label: '椅子' },
+    table:  { color: 0xcc8844, label: '桌子' },
+    lamp:   { color: 0xddcc44, label: '台灯' },
+    flower: { color: 0xcc44aa, label: '花盆' }
+};
+
+Game.displayFurnitureFromInit = function(list){
+    // list = [{id, x, y, kind}, ...]
+    Game.furnitureSprites = Game.furnitureSprites || {};
+    // 清掉旧的（重连 / 重 init 时）
+    Object.keys(Game.furnitureSprites).forEach(function(id){
+        var s = Game.furnitureSprites[id];
+        if(s && s.destroy) s.destroy();
+    });
+    Game.furnitureSprites = {};
+    Game.furnitureGroup = Game.furnitureGroup || game.add.group(Game.entities); // 与 entities 同级，会被一起 Y 排序
+    for(var i = 0; i < list.length; i++){
+        Game.createFurnitureSprite(list[i]);
+    }
+};
+
+Game.createFurnitureSprite = function(f){
+    var tw = Game.map.tileWidth;
+    var th = Game.map.tileHeight;
+    var kindInfo = Game.furnitureKinds[f.kind] || Game.furnitureKinds.chair;
+    var g = game.add.graphics(f.x * tw, f.y * th, Game.furnitureGroup);
+    // 外框（白盒风）
+    g.lineStyle(2, 0x222222, 1);
+    g.beginFill(kindInfo.color, 1);
+    g.drawRoundedRect(4, 4, tw - 8, th - 8, 4);
+    g.endFill();
+    // 给家具一点上下浮动让它"看得见"
+    var tween = game.add.tween(g).to({y: f.y * th - 3}, 800, Phaser.Easing.Sinusoidal.InOut, true, 0, -1, true);
+    g.furnitureID = f.id;
+    g.bobTween = tween;
+    Game.furnitureSprites[f.id] = g;
+};
+
+Game.removeFurnitureSprite = function(furnitureID){
+    var s = Game.furnitureSprites && Game.furnitureSprites[furnitureID];
+    if(!s) return;
+    if(s.bobTween) s.bobTween.stop();
+    var fade = game.add.tween(s).to({alpha: 0}, 200, Phaser.Easing.Linear.None, true);
+    fade.onComplete.add(function(){ s.destroy(); });
+    delete Game.furnitureSprites[furnitureID];
+};
+
+Game.displayInventoryHUD = function(){
+    // 右上角摩尔豆计数 + 下方背包列表，整组固定在相机
+    Game.inventoryHUD = game.add.group();
+    var panelW = 130;
+    var panelH = 200;
+    var panelX = game.width - Game.borderPadding - panelW;
+    var panelY = Game.borderPadding;
+
+    var bg = game.add.graphics(panelX, panelY, Game.inventoryHUD);
+    bg.beginFill(0x000000, 0.55);
+    bg.lineStyle(2, 0xffffff, 0.8);
+    bg.drawRoundedRect(0, 0, panelW, panelH, 6);
+    bg.endFill();
+
+    var labelStyle = { font: '14px Microsoft YaHei, PingFang SC, sans-serif', fill: '#fff200' };
+    Game.moerDouText = game.add.text(panelX + 10, panelY + 8, '💰 0 摩尔豆', labelStyle, Game.inventoryHUD);
+
+    var divider = game.add.graphics(panelX, panelY + 30, Game.inventoryHUD);
+    divider.lineStyle(1, 0xffffff, 0.5);
+    divider.moveTo(8, 0); divider.lineTo(panelW - 8, 0);
+
+    var titleStyle = { font: 'bold 13px Microsoft YaHei, PingFang SC, sans-serif', fill: '#aaffff' };
+    game.add.text(panelX + 10, panelY + 36, '背包', titleStyle, Game.inventoryHUD);
+
+    Game.inventoryTexts = {}; // kind -> Phaser.Text，按需创建
+    Game.inventoryPanelGeom = {x: panelX, y: panelY, w: panelW, h: panelH};
+
+    Game.inventoryHUD.setAll('fixedToCamera', true);
+};
+
+Game.updateInventoryHUD = function(moerDou, inventory){
+    if(!Game.inventoryHUD) Game.displayInventoryHUD();
+    Game.moerDouText.text = '💰 ' + moerDou + ' 摩尔豆';
+    // 重画背包行：先全部隐藏再写
+    Object.keys(Game.inventoryTexts).forEach(function(k){
+        Game.inventoryTexts[k].text = '';
+    });
+    var kinds = Object.keys(inventory || {});
+    var rowH = 18;
+    var startY = Game.inventoryPanelGeom.y + 58;
+    var rowStyle = { font: '13px Microsoft YaHei, PingFang SC, sans-serif', fill: '#ffffff' };
+    for(var i = 0; i < kinds.length; i++){
+        var k = kinds[i];
+        if(!Game.inventoryTexts[k]){
+            Game.inventoryTexts[k] = game.add.text(Game.inventoryPanelGeom.x + 14, 0, '', rowStyle, Game.inventoryHUD);
+            Game.inventoryTexts[k].fixedToCamera = true;
+        }
+        var info = Game.furnitureKinds[k] || { label: k };
+        Game.inventoryTexts[k].cameraOffset.set(Game.inventoryPanelGeom.x + 14, startY + i * rowH);
+        Game.inventoryTexts[k].text = info.label + ' ×' + inventory[k];
+    }
+};
+
+// ===========================
 // Mouse and click-related code
 
 Game.enableClick = function(){

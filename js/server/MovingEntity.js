@@ -62,6 +62,7 @@ MovingEntity.prototype.updateWalk = function(){
         if(this.constructor.name == 'Player') {
             GameServer.checkDoor(this);
             GameServer.checkItem(this);
+            GameServer.checkFurniture(this); // M4a (OpenMole): 踩到家具自动拾起
             GameServer.checkAction(this);
             GameServer.checkSave(this);
             console.log(this.name+' moved to '+this.x+', '+this.y);
