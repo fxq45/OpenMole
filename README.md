@@ -1,6 +1,6 @@
 # OpenMole
 
-**OpenMole** 是一款以《摩尔庄园》为蓝本的开源白盒 MMO 原型，fork 自 [Jerenaux/phaserquest](https://github.com/Jerenaux/phaserquest)。当前阶段：**M2 白盒地图**（无美术资源，纯色 tile + 中文区域标签验证玩法/网络/状态机）。
+**OpenMole** 是一款以《摩尔庄园》为蓝本的开源白盒 MMO 原型，fork 自 [Jerenaux/phaserquest](https://github.com/Jerenaux/phaserquest)。当前阶段：**M3a 门传送 + 玩家小屋**（无美术资源，纯色 tile + 中文区域标签验证玩法/网络/状态机）。
 
 > 项目代号 OpenMole 是为了避免与"摩尔庄园" / "Moore Manor" 商标冲突。
 
@@ -8,24 +8,43 @@
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
-| M0 | Docker 环境跑通原版 phaserquest | ✅ ([PR #1](https://github.com/fxq45/phaserquest/pull/1)) |
-| M1 | 关闭战斗系统（`combatEnabled` flag + `@deprecated`）| ✅ ([PR #2](https://github.com/fxq45/phaserquest/pull/2)) |
-| M2 | 白盒地图 + 4 区域（爱心广场/拉姆农场/摩尔城堡/淘淘乐街）| 🚧 当前 |
-| M3 | Realm 场景切换（多张白盒图，门传送）| - |
-| M4 | 摩尔豆 + 白盒背包 | - |
+| M0 | Docker 环境跑通原版 phaserquest | ✅ ([PR #1](https://github.com/fxq45/OpenMole/pull/1)) |
+| M1 | 关闭战斗系统（`combatEnabled` flag + `@deprecated`）| ✅ ([PR #2](https://github.com/fxq45/OpenMole/pull/2)) |
+| M2 | 白盒地图 + 4 区域（爱心广场/拉姆农场/摩尔城堡/淘淘乐街）、顺手修 `AOIutils.listAdjacentAOIs` off-by-one | ✅ ([PR #3](https://github.com/fxq45/OpenMole/pull/3)) |
+| M3a | 门传送 + 玩家小屋（单地图扩到 122×40，走廊 + door object + AOI ghost 修复） | ✅ ([PR #4](https://github.com/fxq45/OpenMole/pull/4)) |
+| — | 启动 race condition 修复（`init-world` 加 `server.db` 守卫 + docker `restart: unless-stopped`） | ✅ ([PR #5](https://github.com/fxq45/OpenMole/pull/5)) |
+| M3b | 真 Realm 抽象（不同玩家的家是独立实例）| - |
+| M4 | 摩尔豆 + 白盒背包 | 🚧 下一步 |
 | M5 | 第一个小游戏（白盒泡泡龙）| - |
 | M6 | 拉姆养成 + 任务系统 | - |
 
 完整改造路线详见 [docs/OPENMOLE_PLAN.md](docs/OPENMOLE_PLAN.md)。
 
-### 白盒地图说明
+### 地图布局（M3a）
 
-`assets/maps/minimap_*.json` 和 `assets/tilesets/whitebox.png` 由以下脚本生成（不要手改）：
+122 × 40 tile、补对齐 phaserquest 默认的 34×20 AOI 网格 = 4×2 个 AOI：
+
+```
+x=0..67 (户外)            x=68..102 (走廊墙)   x=103..121 (室内)
+ ┌──────────┬─────────┐   ███████████████████   ┌──────────────┐
+ │ 爱心广场 │ 摩尔城堡│   ███████████████████   │   玩家小屋   │
+ ├──────────┼─────────┤   ██████ 门 (67,19) ↔ 门 (103,19) │
+ │ 拉姆农场 │ 淘淘乐街│   ███████████████████   │  (light blue) │
+ └──────────┴─────────┘   ███████████████████   └──────────────┘
+```
+
+走廊 35 tile 宽 > 1 AOI 宽（34），保证户外/室内 AOI 不相邻、各自隔离可见。
+
+### 白盒地图生成
+
+`assets/maps/minimap_*.json` 和 `assets/tilesets/whitebox.png` 由以下脚本生成（不要手改 JSON / PNG）：
 
 ```bash
-python3 scripts/generate-whitebox-tileset.py   # 生成 5x1 纯色方块 PNG
-node scripts/generate-whitebox-map.js          # 生成 68x40 tile 的 Tiled JSON
+python3 scripts/generate-whitebox-tileset.py   # 生成 7x1 纯色方块 PNG
+node scripts/generate-whitebox-map.js          # 生成 122x40 tile 的 Tiled JSON
 ```
+
+7 个 tile color：白=爱心广场、灰=摩尔城堡、绿=拉姆农场、黄=淘淘乐街、深灰=墙、浅蓝=玩家小屋地板、棕=门。
 
 要换地图布局/颜色，改这两个脚本里的常量后重新执行即可。
 
@@ -36,7 +55,15 @@ docker compose up -d --build
 # 浏览器打开 http://localhost/
 ```
 
-老存档（来自原版 172x314 地图）的坐标会自动重置到出生点，无需手动清库。
+* 老存档（来自原版 172x314 地图）的坐标会自动重置到出生点，无需手动清库。
+* 启服后前 1-3 秒如果浏览器马上连，会看到 console 里 `Server not ready, re-attempting...` 重试几次后正常进入（PR #5 后不会再崩服）。
+* 端口 80 被占用（Skype / IIS 等）的话，把 `docker-compose.yml` 里 `'80:80'` 改成 `'8081:80'` 后访问 `http://localhost:8081/`。
+
+### 玩法验证（M3a结束后）
+
+* 出生在户外中间、点鼠标可以在 4 色区域间自由奔走。
+* 走到 (67,19) 棕门会瞬移到 (104,19) 玩家小屋；玩家小屋里 (103,19) 棕门可返回户外 (66,19)。
+* 多人进入、聊天、移动同步都走原版 socket.io + AOI 设计，未增加协议、仅增加了 `leftAOIs[]` 字段修复原版 ghost-player 老 bug。
 
 ---
 
