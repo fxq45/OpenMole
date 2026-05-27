@@ -92,7 +92,8 @@ CoDec.globalUpdateSchema = {
         newplayers: CoDec.playerSchema,
         newitems: CoDec.itemSchema,
         newmonsters: CoDec.monsterSchema,
-        disconnected: CoDec.int16schema
+        disconnected: CoDec.int16schema,
+        leftAOIs: CoDec.int16schema // M3 (OpenMole): players who left observer's AOI (silent removal)
     },
     maps : {
         players: CoDec.playerSchema,

@@ -50,8 +50,8 @@ Game.init = function(){
 
 Game.preload = function() {
     game.load.tilemap('map', 'assets/maps/minimap_client.json', null, Phaser.Tilemap.TILED_JSON);
-    // M2 (OpenMole): 白盒 tileset，5 个 32x32 纯色方块（爱心广场/摩尔城堡/拉姆农场/淘淘乐街/墙）
-    // 原 tilesheet.png 已不再加载（位于 assets/tilesets/tilesheet.png，未删除以备 M4+ 资源切换参考）
+    // M3 (OpenMole): 白盒 tileset，7 个 32x32 纯色方块
+    // 户外 4 区 + 墙 + 室内地板 + 门
     game.load.spritesheet('tileset', 'assets/tilesets/whitebox.png',32,32);
     game.load.atlasJSONHash('atlas4', 'assets/sprites/atlas4.png', 'assets/sprites/atlas4.json'); // Atlas of monsters
     game.load.spritesheet('bubble', 'assets/sprites/bubble2.png',5,5); // tilesprite used to make speech bubbles
@@ -141,6 +141,14 @@ Game.updateWorld = function(data) { // data is the update package from the serve
     if(data.disconnected) { // data.disconnected is an array of disconnected players
         for (var i = 0; i < data.disconnected.length; i++) {
             Game.removePlayer(Game.charactersPool[data.disconnected[i]],true); // animate death
+        }
+    }
+
+    // M3 (OpenMole): leftAOIs 表示从我的可视 AOI 离开的玩家（如别人传送走了）。
+    // 与 disconnected 不同：玩家还在线，只是看不见了，所以静默移除精灵，不播放死亡动画。
+    if(data.leftAOIs) {
+        for (var i = 0; i < data.leftAOIs.length; i++) {
+            Game.removePlayer(Game.charactersPool[data.leftAOIs[i]],false); // silent removal
         }
     }
 
@@ -1291,14 +1299,16 @@ Game.displayNPC = function() {
     }
 };
 
-// M2 (OpenMole): 4 个白盒区域名称的中文标签。
+// M3 (OpenMole): 5 个白盒区域名称的中文标签（M2 户外 4 个 + M3 室内 1 个）。
 // 用 Phaser 原生 text（canvas 字体）而非 BitmapText：BitmapText 需自制 XML+PNG 字体才能支持
 // 中文字符，白盒阶段不值得；后续做正式 UI 时再统一替换。
+// 室内「玩家小屋」位置：地图 x=104..120, y=10..28 之间的中心点。
 Game.zoneLabels = [
-    { text: '爱心广场', tileX: 17, tileY: 10 },  // 左上：白色区中心
-    { text: '摩尔城堡', tileX: 50, tileY: 10 },  // 右上：灰色区中心
-    { text: '拉姆农场', tileX: 17, tileY: 29 },  // 左下：绿色区中心
-    { text: '淘淘乐街', tileX: 50, tileY: 29 }   // 右下：黄色区中心
+    { text: '爱心广场', tileX: 17, tileY: 10 },  // 户外左上：白色区中心
+    { text: '摩尔城堡', tileX: 50, tileY: 10 },  // 户外右上：灰色区中心
+    { text: '拉姆农场', tileX: 17, tileY: 29 },  // 户外左下：绿色区中心
+    { text: '淘淘乐街', tileX: 50, tileY: 29 },  // 户外右下：黄色区中心
+    { text: '玩家小屋', tileX: 112, tileY: 19 }  // 室内：浅蓝色房间中心
 ];
 
 Game.displayZoneLabels = function() {
