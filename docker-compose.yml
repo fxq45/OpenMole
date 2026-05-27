@@ -1,6 +1,7 @@
 services:
   mongo:
     image: 'mongo'
+    restart: unless-stopped
     ports:
       - '127.0.0.1:27017:27017'
     volumes:
@@ -9,6 +10,7 @@ services:
   phaserquest:
     tty: true
     stdin_open: true
+    restart: unless-stopped
     depends_on:
       - mongo
     build:
