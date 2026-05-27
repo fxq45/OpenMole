@@ -21,6 +21,10 @@ function Player(name){
     this.equip(2,"clotharmor");
     this.updatePacket = new PersonalUpdatePacket();
     this.newAOIs = [];
+    // M4a (OpenMole): 摩尔豆货币 + 背包。新玩家默认 100 豆、空背包。
+    // inventory 用 { kind -> count } 字典存储，便于增量更新；按需求未来要支持多 slot 再升级。
+    this.moerDou = 100;
+    this.inventory = {};
 }
 
 Player.prototype = Object.create(MovingEntity.prototype); // Declares the inheritance relationship
@@ -72,6 +76,9 @@ Player.prototype.dbTrim = function(){
     }
     trimmed['weapon'] = GameServer.db.itemsIDmap[this.weapon];
     trimmed['armor'] = GameServer.db.itemsIDmap[this.armor];
+    // M4a (OpenMole): 持久化货币 + 背包
+    trimmed['moerDou'] = this.moerDou;
+    trimmed['inventory'] = this.inventory;
     return trimmed;
 };
 
@@ -96,6 +103,22 @@ Player.prototype.getDataFromDb = function(document){
     this.setAOI();
     this.equip(1,document['weapon']);
     this.equip(2,document['armor']);
+    // M4a (OpenMole): 老存档没有这两个字段时给默认值（== 新玩家初始值）
+    this.moerDou = (typeof document.moerDou === 'number') ? document.moerDou : 100;
+    this.inventory = (document.inventory && typeof document.inventory === 'object') ? document.inventory : {};
+};
+
+// M4a (OpenMole): 拾起家具 — 只进背包，不动摩尔豆。
+// 摩尔豆是任务 / 打工 / 小游戏的奖励（M5+ 接入），不是「捡到东西就送」。
+// Furniture.value 字段保留作为未来商店「售价 / 回收价」的引用。
+// 广播 furniture-pickup（让所有客户端的家具 sprite 消失）由 GameServer.checkFurniture 负责。
+Player.prototype.pickupFurniture = function(furniture){
+    this.inventory[furniture.kind] = (this.inventory[furniture.kind] || 0) + 1;
+    // 立刻存档：家具一旦被捡走就从世界永久消失，不存档 + 玩家在走够 30 tile 触发
+    // checkSave 之前断线 → inventory 改动丢失而世界已少一个家具，造成不可逆数据不一致。
+    GameServer.savePlayer(this);
+    var socket = GameServer.server.getSocket(this.socketID);
+    if(socket) socket.emit('inventory-update', {moerDou: this.moerDou, inventory: this.inventory});
 };
 
 Player.prototype.getIndividualUpdatePackage = function(){

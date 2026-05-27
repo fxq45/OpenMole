@@ -161,6 +161,18 @@ server.sendInitializationPacket = function(socket,packet){
     packet = server.addStamp(packet);
     if(server.enableBinary) packet = Encoder.encode(packet,CoDec.initializationSchema);
     socket.emit('init',packet);
+    // M4a (OpenMole): init 走二进制、改起来要改 CoDec schema。家具/背包不频繁、走 JSON 旁路。
+    // 玩家自己的最新背包 + 摩尔豆 + 世界家具列表都跟在 init 后面紧接着发。
+    var player = gs.getPlayer(socket.id);
+    if(player){
+        socket.emit('inventory-update', {moerDou: player.moerDou, inventory: player.inventory});
+    }
+    socket.emit('furniture-init', {list: gs.listFurniture()});
+};
+
+// M4a (OpenMole): 全广播某家具被某玩家拾起 —— 所有在线客户端把对应 sprite 消失（带个轻量动画）。
+server.broadcastFurniturePickup = function(furnitureID, pickerPlayerID){
+    io.emit('furniture-pickup', {id: furnitureID, by: pickerPlayerID});
 };
 
 server.sendUpdate = function(socketID,pkg){

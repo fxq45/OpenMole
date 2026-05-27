@@ -49,6 +49,7 @@ var AOI = require('./AOI.js').AOI;
 var Player = require('./Player.js').Player;
 var Monster = require('./Monster.js').Monster;
 var Item = require('./Item.js').Item;
+var Furniture = require('./Furniture.js').Furniture; // M4a (OpenMole): 白盒家具
 
 //A few helper functions
 GameServer.addPlayerID = function(socketID,playerID){ // map a socket id to a player id
@@ -154,6 +155,7 @@ GameServer.readMap = function(){
         GameServer.setUpEntities();
         GameServer.setUpChests();
         GameServer.setUpRoaming();
+        GameServer.setUpFurniture(); // M4a (OpenMole): 摆放可拾家具
         GameServer.setLoops();
         console.log('Map read');
         GameServer.mapReady = true;
@@ -547,6 +549,56 @@ GameServer.checkDoor = function(player){ // Check if the player ended up on a te
 GameServer.checkItem = function(player){ // Check if the player ended up on an item
     var item = GameServer.items.getFirstFiltered(player.x,player.y,['visible'],['inChest']); // should be visible but not in a chest
     if(item) if(player.applyItem(item)) item.pick();
+};
+
+// M4a (OpenMole): 路径终点踩到家具 → 拾起。仿照 checkDoor / checkItem 的"路径终点触发"模式。
+// 不做"经过即捡"是为了让用户能可控地选择是否拾起（点哪走哪、踩上才捡）。
+GameServer.checkFurniture = function(player){
+    var key = player.x + ',' + player.y;
+    var f = GameServer.furnitureByTile[key];
+    if(!f) return;
+    player.pickupFurniture(f);
+    delete GameServer.furnitureByTile[key];
+    delete GameServer.furnitureByID[f.id];
+    // 简单起见：全广播。家具数量少（~8），不值得按 AOI 切。
+    GameServer.server.broadcastFurniturePickup(f.id, player.id);
+};
+
+// M4a (OpenMole): 初始化白盒家具实例表。
+// 8 个家具分布在 4 个户外象限（每象限 2 个），避开出生点 (30..36, 18..22) 和门 (67,19)。
+// 4 种 kind: chair / table / lamp / flower —— 客户端用不同颜色矩形渲染。
+GameServer.setUpFurniture = function(){
+    GameServer.furnitureByID = {};   // id -> Furniture（pickup 时查 id 用）
+    GameServer.furnitureByTile = {}; // 'x,y' -> Furniture（checkFurniture 查坐标用）
+    GameServer.lastFurnitureID = 0;
+
+    // [x, y, kind, value]
+    var spawns = [
+        // 爱心广场 (top-left, x=0..33, y=0..19)
+        [10,  5, 'chair',  10],
+        [25, 12, 'flower', 15],
+        // 摩尔城堡 (top-right, x=34..67, y=0..19)
+        [45,  5, 'table',  20],
+        [60, 12, 'lamp',   25],
+        // 拉姆农场 (bottom-left, x=0..33, y=20..39)
+        [10, 30, 'flower', 15],
+        [25, 35, 'chair',  10],
+        // 淘淘乐街 (bottom-right, x=34..67, y=20..39)
+        [45, 30, 'lamp',   25],
+        [60, 35, 'table',  20]
+    ];
+    spawns.forEach(function(s){
+        var id = ++GameServer.lastFurnitureID;
+        var f = new Furniture(id, s[0], s[1], s[2], s[3]);
+        GameServer.furnitureByID[id] = f;
+        GameServer.furnitureByTile[s[0] + ',' + s[1]] = f;
+    });
+};
+
+GameServer.listFurniture = function(){
+    return Object.keys(GameServer.furnitureByID).map(function(id){
+        return GameServer.furnitureByID[id].trim();
+    });
 };
 
 // @deprecated M1 (OpenMole): combatEnabled 为 false 时直接返回，不再检测怪物近身。

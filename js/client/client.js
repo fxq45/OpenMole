@@ -110,6 +110,21 @@ Client.socket.on('update',function(data){ // This event triggers uppon receiving
     if(data.local) Game.updateSelf(data.local);
 });
 
+// M4a (OpenMole): 服务端在 init 后紧跟着发的家具/背包 JSON 旁路事件
+// 之所以单独走（不进 init 二进制包）：CoDec 改起来牵动 Encoder/Decoder 两端，
+// 而家具/背包数据低频、JSON 体积可忽略。
+Client.socket.on('furniture-init', function(data){
+    Game.displayFurnitureFromInit(data.list);
+});
+
+Client.socket.on('furniture-pickup', function(data){
+    Game.removeFurnitureSprite(data.id);
+});
+
+Client.socket.on('inventory-update', function(data){
+    Game.updateInventoryHUD(data.moerDou, data.inventory);
+});
+
 Client.socket.on('reset',function(data){
     // If there is a mismatch between client and server coordinates, this event will reset the client to the server coordinates
     // data contains the correct position of the player
