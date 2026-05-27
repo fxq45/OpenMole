@@ -81,6 +81,9 @@ MovingEntity.prototype.setAtDelta = function(delta){
     this.y = this.route.path[delta].y;
 };
 
+// @deprecated M1 (OpenMole): combatEnabled = false 时 GameServer 不再调用以下战斗方法
+// （startFight / damage / updateLife 中的死亡分支 / die / endFight / manageFoes / addFoe /
+// hasFoe 等）。保留源码以备后续 milestone 改造为战斗类小游戏时参考。
 MovingEntity.prototype.startFight = function(target){
     if(!this.alive || !target.alive) return;
     if(!this.target) this.setTarget(target);

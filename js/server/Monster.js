@@ -1,5 +1,10 @@
 /**
  * Created by Jerome on 24-02-17.
+ *
+ * @deprecated M1 (OpenMole): 整个文件在 GameServer.combatEnabled = false 时不会被实例化。
+ * Monster 类、AI、updateFight、loot 逻辑全部停摆，但源码保留在原位置（require 链未断），
+ * 以便后续 milestone 把战斗代码改造成 PVE 类小游戏（如泡泡龙、抓豆）时复用怪物 AI 思路。
+ * 详见 js/server/_deprecated/README.md。
  */
 
 var GameServer = require('./GameServer.js').GameServer;
