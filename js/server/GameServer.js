@@ -719,6 +719,17 @@ GameServer.handleAOItransition = function(entity,previous){
     var AOIs = entity.listAdjacentAOIs(true);
     if(previous){
         var previousAOIs = AOIutils.listAdjacentAOIs(previous);
+        // M3 (OpenMole): 原版只把「新加入的 AOI」加进广播；离开的 AOI 不通知任何人。
+        // 正常 1-tile 步行时 AOI 边界缓慢推移，离开者从视野边缘自然消失基本看不出。
+        // 但 M3 的门传送会跨多个 AOI 跳跃，旧 AOI 邻居那里会残留一个不再移动的玩家精灵（ghost）。
+        // 补一发 leftAOIs 数组：对于 Player，把「离开的 AOI」也通知其客户端移除该精灵。
+        // 用独立字段 leftAOIs（而非 disconnected）避免触发死亡动画。
+        if(entity.constructor.name == 'Player'){
+            var leftAOIs = previousAOIs.diff(AOIs);
+            leftAOIs.forEach(function(aoi){
+                GameServer.addLeftAOIToAOI(aoi, entity.id);
+            });
+        }
         // Array_A.diff(Array_B) returns the elements in A that are not in B
         // This is used because only the AOIs that are now adjacent, but were not before, need an update. Those who where already adjacent are up-to-date
         AOIs = AOIs.diff(previousAOIs);
@@ -746,6 +757,13 @@ GameServer.updateAOIroute = function(aoi,category,id,route){
 
 GameServer.addDisconnectToAOI = function(aoi,playerID) {
     GameServer.AOIs[aoi].updatePacket.addDisconnect(playerID);
+    GameServer.dirtyAOIs.add(aoi);
+};
+
+// M3 (OpenMole): 通知 AOI 内观察者：某玩家离开了你的可视 AOI 范围（与「断开连接」语义区分）。
+// 客户端收到此消息将移除对应精灵但不播放死亡动画。
+GameServer.addLeftAOIToAOI = function(aoi,playerID) {
+    GameServer.AOIs[aoi].updatePacket.addLeftAOI(playerID);
     GameServer.dirtyAOIs.add(aoi);
 };
 

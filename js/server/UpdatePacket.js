@@ -7,6 +7,7 @@ function UpdatePacket(){
     this.newitems = [];
     this.newmonsters = [];
     this.disconnected = []; // list of id's of disconnected players since last update
+    this.leftAOIs = []; // M3 (OpenMole): list of id's of players who left this AOI's visibility (silent removal, no death animation)
     this.players = {}; // list of player objects already existing for which properties have been update
     this.items = {};
     this.monsters = {};
@@ -34,6 +35,12 @@ UpdatePacket.prototype.addObject = function(object){
 
 UpdatePacket.prototype.addDisconnect = function(playerID){
     this.disconnected.push(playerID);
+};
+
+// M3 (OpenMole): 加入「离开 AOI」名单，与 disconnect 区分：客户端拿到后
+// 静默 removePlayer（不播放死亡动画），用于跨 AOI 大跨度传送时清理对方 ghost。
+UpdatePacket.prototype.addLeftAOI = function(playerID){
+    this.leftAOIs.push(playerID);
 };
 
 UpdatePacket.prototype.updateRoute = function(type,entityID,route){
@@ -96,6 +103,7 @@ UpdatePacket.prototype.isEmpty = function(){
     if(this.newitems.length > 0) return false;
     if(this.newmonsters.length > 0) return false;
     if(this.disconnected.length > 0) return false;
+    if(this.leftAOIs.length > 0) return false;
     return true;
 };
 
@@ -107,6 +115,7 @@ UpdatePacket.prototype.clean = function(){
     if(!this.newitems.length) delete this.newitems;
     if(!this.newmonsters.length) delete this.newmonsters;
     if(!this.disconnected.length) delete this.disconnected;
+    if(!this.leftAOIs.length) delete this.leftAOIs;
     return this;
 };
 
