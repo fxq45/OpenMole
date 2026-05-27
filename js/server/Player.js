@@ -108,11 +108,12 @@ Player.prototype.getDataFromDb = function(document){
     this.inventory = (document.inventory && typeof document.inventory === 'object') ? document.inventory : {};
 };
 
-// M4a (OpenMole): 拾起家具 — 加进 inventory + 摩尔豆奖励 + 通知本人最新数据。
+// M4a (OpenMole): 拾起家具 — 只进背包，不动摩尔豆。
+// 摩尔豆是任务 / 打工 / 小游戏的奖励（M5+ 接入），不是「捡到东西就送」。
+// Furniture.value 字段保留作为未来商店「售价 / 回收价」的引用。
 // 广播 furniture-pickup（让所有客户端的家具 sprite 消失）由 GameServer.checkFurniture 负责。
 Player.prototype.pickupFurniture = function(furniture){
     this.inventory[furniture.kind] = (this.inventory[furniture.kind] || 0) + 1;
-    this.moerDou += furniture.value;
     var socket = GameServer.server.getSocket(this.socketID);
     if(socket) socket.emit('inventory-update', {moerDou: this.moerDou, inventory: this.inventory});
 };
