@@ -108,7 +108,12 @@ io.on('connection',function(socket){
     });
 
     socket.on('init-world',function(data){
-        if(!gs.mapReady) {
+        // 两个启动条件都等满足才能处理连接：
+        //   1. 地图读取完成 (gs.mapReady)
+        //   2. MongoDB 连接已建立 (server.db)
+        // 两者是独立异步路径 (readMap 同步、mongo.connect 异步)，需要都等
+        // 否则后面 addNewPlayer / loadPlayer 调 server.db.collection(...) 会 NPE 崩服。
+        if(!gs.mapReady || !server.db) {
             socket.emit('wait');
             return;
         }
