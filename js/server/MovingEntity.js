@@ -60,9 +60,13 @@ MovingEntity.prototype.updateWalk = function(){
     this.setAtDelta(delta);
     if(delta == maxDelta){
         if(this.constructor.name == 'Player') {
+            // M4a (OpenMole): checkFurniture 放在 checkDoor 之前 ——
+            // 这样玩家路径终点踩到家具会就地拾起；如果终点是门，则先（按 pre-teleport 坐标）
+            // 判断家具，再传送，避免走到门的"目的地"那一格会顺手抓走目的地家具的反直觉行为。
+            // checkItem 保留在原位（post-teleport），与上游 phaserquest 行为一致。
+            GameServer.checkFurniture(this);
             GameServer.checkDoor(this);
             GameServer.checkItem(this);
-            GameServer.checkFurniture(this); // M4a (OpenMole): 踩到家具自动拾起
             GameServer.checkAction(this);
             GameServer.checkSave(this);
             console.log(this.name+' moved to '+this.x+', '+this.y);
