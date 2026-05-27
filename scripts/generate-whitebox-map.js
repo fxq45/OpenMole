@@ -92,8 +92,8 @@ function getTileGid(x, y) {
     // 5. 室内段（x >= IN_LEFT）
     // 室内左外墙
     if (x === IN_LEFT) return GID_WALL;
-    // 室内上下墙（房间四面墙）
-    if (y < IN_TOP || y > IN_BOTTOM) return GID_WALL;
+    // 室内上下墙（IN_TOP=9 / IN_BOTTOM=29 自身也是墙，与 IN_LEFT 一致）
+    if (y <= IN_TOP || y >= IN_BOTTOM) return GID_WALL;
     // 室内地板
     return GID_INDOOR;
 }
