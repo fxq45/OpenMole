@@ -8,6 +8,11 @@ var clone = require('clone'); // used to clone objects, essentially used for clo
 var rwc = require('random-weighted-choice'); // used to randomly decide which loot a monster should drop
 
 var GameServer = {
+    // M1 (OpenMole): 战斗系统总开关。设为 false 时，服务端不生成怪物、不触发战斗、
+    // 不进行掉落，玩家只能移动、聊天、做 AOI 同步。相关 @deprecated 源码（Monster.js、
+    // MovingEntity 的 startFight/damage/die、以及本文件下方的 setUpFight/handleKill 等）
+    // 保留在原位置以便后续 milestone 改造成战斗类小游戏时参考。详见 js/server/_deprecated/README.md。
+    combatEnabled: false,
     map: null, // object containing all the data about the world map
     mapReady: false, // is the server done processing the map or not
     // frequency of the server update loop ; rate at which the player and monsters objects will call their "update" methods
@@ -186,7 +191,8 @@ GameServer.setUpEntities = function(){ // Set up monsters & items
             var item = new Item(position.x,position.y-1,entityInfo.sprite,true,false,false); // respawn, not chest, not loot
             GameServer.addAtLocation(item);
         } else if (entityInfo.monster) {
-            GameServer.addMonster(position,entityInfo.sprite);
+            // M1 (OpenMole): 战斗关闭时跳过怪物生成。@deprecated
+            if (GameServer.combatEnabled) GameServer.addMonster(position,entityInfo.sprite);
         }
     }
 };
@@ -229,7 +235,9 @@ GameServer.setUpChests = function(){ // Sets up chests and chest areas
     }
 };
 
+// @deprecated M1 (OpenMole): 仅在 combatEnabled = true 时生成游荡怪物群。
 GameServer.setUpRoaming = function(){ // Sets up packs of randomly positioned monsters within an area
+    if (!GameServer.combatEnabled) return;
     for (var d = 0; d < GameServer.objects.roaming.length; d++) {
         var roaming =  GameServer.objects.roaming[d];
         var positions = new Set(); // use a set of positions to avoid having multiple monsters on the same tile
@@ -496,11 +504,13 @@ GameServer.handlePath = function(path,action,orientation,socket){ // Processes a
 
     var departureTime = Date.now() - socket.latency; // Needed the corrected departure time for the update loop (updateWalk())
     player.setRoute(path,departureTime,socket.latency,action,orientation);
-    if(action && action.action == 3){ // fight
-        var monster = GameServer.monstersTable[action.id];
-        if(monster.alive) player.setTarget(monster);
+    if(action && action.action == 3){ // fight @deprecated M1 (OpenMole): 战斗关闭时忽略客户端发来的 fight action。
+        if (GameServer.combatEnabled) {
+            var monster = GameServer.monstersTable[action.id];
+            if(monster && monster.alive) player.setTarget(monster);
+        }
     }
-    if(player.inFight && action && action.action != 3) player.endFight();
+    if(GameServer.combatEnabled && player.inFight && action && action.action != 3) player.endFight();
     return true;
 };
 
@@ -539,7 +549,9 @@ GameServer.checkItem = function(player){ // Check if the player ended up on an i
     if(item) if(player.applyItem(item)) item.pick();
 };
 
+// @deprecated M1 (OpenMole): combatEnabled 为 false 时直接返回，不再检测怪物近身。
 GameServer.checkMonster = function(player){ // Check if the player is adjacent to an aggressive monster that should attack him
+    if (!GameServer.combatEnabled) return;
     var adj = [[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[0,1],[1,1]];
     for(var c = 0; c < 9; c++) {
         var x = player.x + adj[c][0];
@@ -552,7 +564,8 @@ GameServer.checkMonster = function(player){ // Check if the player is adjacent t
 GameServer.checkAction = function(player){
     if(player.route.action){
         var action = player.route.action;
-        if(action.action == 3){ // fight
+        if(action.action == 3){ // fight @deprecated M1 (OpenMole): 战斗关闭时跳过。
+            if (!GameServer.combatEnabled) return;
             var monster = GameServer.monstersTable[action.id];
             if(!GameServer.areFighting(player,monster)) GameServer.setUpFight(player,monster);
         }else if(action.action == 4){ // chest
@@ -573,6 +586,9 @@ GameServer.checkSave = function(player){
 };
 
 // ====================================
+// @deprecated M1 (OpenMole): 以下战斗相关函数（areFighting / setUpFight / handleKill /
+// formatLootTable / dropLoot / spawnHiddenChest）在 combatEnabled = false 时不会被调用，
+// 保留源码以备后续 milestone 改造成战斗类小游戏（如 PVE 副本）时参考。
 // Code related to fighting and related concepts
 
 GameServer.areFighting = function(A,B){
@@ -642,13 +658,18 @@ GameServer.update = function(){ // called every 1/12 of sec
         var player = GameServer.players[key];
         if(player.alive) player.update();
     });
-    Object.keys(GameServer.monstersTable).forEach(function(key) {
-        var monster = GameServer.monstersTable[key];
-        if(monster.alive) monster.update();
-    });
+    // M1 (OpenMole): 战斗关闭时不再驱动怪物 AI 更新。@deprecated
+    if (GameServer.combatEnabled) {
+        Object.keys(GameServer.monstersTable).forEach(function(key) {
+            var monster = GameServer.monstersTable[key];
+            if(monster.alive) monster.update();
+        });
+    }
 };
 
 GameServer.regenerate = function(){
+    // M1 (OpenMole): 战斗关闭后玩家不会掉血，回血循环也无意义。@deprecated
+    if (!GameServer.combatEnabled) return;
     Object.keys(GameServer.players).forEach(function(key) {
         var player = GameServer.players[key];
         if(player.alive && player.life < player.maxLife) player.regenerate();
